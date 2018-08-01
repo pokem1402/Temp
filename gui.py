@@ -16,7 +16,9 @@ import gettext
 import numpy as np
 from PIL import Image
 import os
-import dircache
+
+# model import
+from model import simple
 
 
 class MyFrame(wx.Frame):
@@ -54,7 +56,8 @@ class MyFrame(wx.Frame):
         self.text_ctrl_1 = wx.TextCtrl(self.notebook_1_pane_1, wx.ID_ANY, _("log field..\n\n\n\n"), style=wx.TE_MULTILINE | wx.TE_READONLY)
 
         self.notebook_1_pane_2 = wx.Panel(self.notebook_1, wx.ID_ANY)
-        self.button_2 = wx.Button(self.notebook_1_pane_2, wx.ID_ANY, _("Train"))
+        self.button_2 = wx.Button(self.notebook_1_pane_2, wx.ID_ANY, _("ex : open_data"))
+        self.button_3 = wx.Button(self.notebook_1_pane_2, wx.ID_ANY, _("ex : User-custom"))
         self.tree_ctrl_2 = self.tree_ctrl_1 #wx.TreeCtrl(self.notebook_1_pane_1, wx.ID_ANY, style=wx.TR_HIDE_ROOT)
         self.notebook_1_pane_3 = wx.Panel(self.notebook_1, wx.ID_ANY)
         self.notebook_1_pane_4 = wx.Panel(self.notebook_1, wx.ID_ANY)
@@ -123,6 +126,8 @@ class MyFrame(wx.Frame):
         sizer_Models = wx.BoxSizer(wx.VERTICAL)
         sizer_Models_Left = wx.BoxSizer(wx.VERTICAL)
         sizer_Models_Left.Add(self.button_2, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
+        sizer_Models_Left.Add(self.button_3, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
+
 #        sizer_Models_Left.Add(self.tree_ctrl_1, 1, wx.ALL | wx.EXPAND, 0)
         sizer_Models.Add(sizer_Models_Left)
 #        sizer_Models.Add(self.text_ctrl_1, 1, wx.EXPAND, 0)
@@ -136,12 +141,13 @@ class MyFrame(wx.Frame):
         sizer_1.Fit(self)
         self.Layout()
         # end wxGlade
-    
+
     def __bind_events(self):
         self.Bind(wx.EVT_BUTTON, self.button_1_clicked, self.button_1)
         self.Bind(wx.EVT_TREE_ITEM_EXPANDING, self.onExpand, self.tree_ctrl_1)
-        
+
         self.Bind(wx.EVT_BUTTON, self.button_2_clicked, self.button_2)
+        self.Bind(wx.EVT_BUTTON, self.button_3_clicked, self.button_3)
 
     def button_1_clicked(self, e):
         print('BUTTON 1 CLICKED')
@@ -150,14 +156,14 @@ class MyFrame(wx.Frame):
             style=wx.DD_DEFAULT_STYLE | wx.DD_NEW_DIR_BUTTON)
         while dlg.ShowModal() == wx.ID_OK:
             self.SetStatusText("Chosen: %s\n" % dlg.GetPath())
-            
+
             if os.path.isdir(os.path.join(dlg.GetPath(), "Data")) == False:
                 print("It doesn't have Data folder")
 #            if os.direxists(os.path.join(dlg.GetPath())
                 continue
             elif os.path.exists(os.path.join(dlg.GetPath(), "train.txt")) == False:
                 print("It doesn't have train.txt")
-            else: 
+            else:
                 self.buildTree(dlg.GetPath())
                 break
         dlg.Destroy()
@@ -165,8 +171,38 @@ class MyFrame(wx.Frame):
 #        dialog1.Show()
 
     def button_2_clicked(self, e):
-        print('BUTTON 2 CLICKED')
-
+        from model import simple
+        import tensorflow as tf
+        tf.reset_default_graph()
+        with tf.Session() as sess:
+            simple.load_model(sess,
+                       dataset='mnist',
+                       classes=10,
+                       step_interval = 100,
+                       image_size = [28,28,1],
+                       train=True,
+                       test=True,
+                       epochs=10)
+            print('BUTTON 2 CLICKED')
+    def button_3_clicked(self, e):
+        # print(self.x_train,self.y_train)
+        from model import simple
+        import tensorflow as tf
+        tf.reset_default_graph()
+        with tf.Session() as sess:
+            simple.load_model(sess,
+                       dataset='CIFAR-10',
+                       train_data = 'CIFAR-10',
+                       # train_label = self.y_train,
+                       test_data = 'CIFAR-10',
+                       # test_label = self.y_test,
+                       classes=5,
+                       epoch_interval = 1,
+                       image_size = [32,32,3],
+                       train=True,
+                       test=True,
+                       epochs=20)
+            print('BUTTON 3 CLICKED')
 
     def onExpand(self, e):
         itemID = e.GetItem()
@@ -184,13 +220,13 @@ class MyFrame(wx.Frame):
         self.extendTree(self.rootID)
         print(self.rootID)
 #        self.tree_ctrl_1.Expand(self.rootID)
-    
+
         self.getStatistics(rootdirPath)
 
     def extendTree(self, parentID):
         parentPath = self.tree_ctrl_1.GetItemData(parentID)
 
-        subdirs = dircache.listdir(parentPath)
+        subdirs = os.listdir(parentPath)
         subdirs.sort()
         for child in subdirs:
             print(child)
@@ -199,14 +235,14 @@ class MyFrame(wx.Frame):
                 childID = self.tree_ctrl_1.AppendItem(parentID, child)
                 self.tree_ctrl_1.SetItemData(childID, childPath)
 
-                grandsubdirs = dircache.listdir(childPath)
+                grandsubdirs = os.listdir(childPath)
                 grandsubdirs.sort()
                 for grandchild in grandsubdirs:
                     grandchildPath = os.path.join(childPath, grandchild)
                     if os.path.isdir(grandchildPath) and not os.path.islink(grandchild):
                         grandchildID = self.tree_ctrl_1.AppendItem(childID, grandchild)
                         self.tree_ctrl_1.SetItemData(grandchildID, grandchildPath)
-   
+
     def getStatistics(self, rootdirPath):
         # dir info
         self.text_ctrl_2.write(rootdirPath)
@@ -217,7 +253,7 @@ class MyFrame(wx.Frame):
 #        data_check = True
 #        for file in file_list:
 #            fname, ext = os.path.splitext(file)
-#            
+#
 #            if ext == '.png' or ext == '.jpg':
 #                print(file)
 #            else:
@@ -227,28 +263,30 @@ class MyFrame(wx.Frame):
 #        if not data_check:
 #            return
 #
-#        data = np.array([np.array(Image.open(datadirPath+file)) for file in file_list]) 
+#        data = np.array([np.array(Image.open(datadirPath+file)) for file in file_list])
 
         # train data
         trainTxt = open(rootdirPath+'/train.txt', 'r')
-        x_train = np.array([np.array(Image.open(rootdirPath+'/'+line.split()[0])) for line in trainTxt])
+        self.x_train = np.array([np.array(Image.open(rootdirPath+'/'+line.split()[0])) for line in trainTxt])
         trainTxt.close()
         trainTxt = open(rootdirPath+'/train.txt', 'r')
-        y_train = np.array([line.split()[1] for line in trainTxt])
-        print(x_train.shape, y_train.shape)
+        self.y_train = np.array([line.split()[1] for line in trainTxt])
+        trainTxt.close()
+        print(self.x_train.shape, self.y_train.shape)
 
         # test data
         testTxt = open(rootdirPath+'/test.txt', 'r')
-        x_test = np.array([np.array(Image.open(rootdirPath+'/'+line.split()[0])) for line in testTxt])
+        self.x_test = np.array([np.array(Image.open(rootdirPath+'/'+line.split()[0])) for line in testTxt])
         testTxt.close()
         testTxt = open(rootdirPath+'/test.txt', 'r')
-        y_test = np.array([line.split()[1] for line in testTxt])
-        print(x_test.shape, y_test.shape)           
+        self.y_test = np.array([line.split()[1] for line in testTxt])
+        testTxt.close()
+        # print(x_test.shape, y_test.shape)
 #        self.text_ctrl_4.write(str(len(os.walk(datadirPath).next()[2])))
-        self.text_ctrl_4.write(str(len(x_train)) + ' / ' + str(len(x_test)))
+        self.text_ctrl_4.write(str(len(self.x_train)) + ' / ' + str(len(self.x_test)))
 
         # label count
-        self.text_ctrl_5.write(str(len(np.unique(np.concatenate((y_train, y_test), axis=0)))))
+        self.text_ctrl_5.write(str(len(np.unique(np.concatenate((self.y_train, self.y_test), axis=0)))))
 
 
 # end of class MyFrame
@@ -297,7 +335,7 @@ class MyDialog1(wx.Dialog):
                                      style=wx.DIRCTRL_DIR_ONLY)
 
         self.button_1 = wx.Button(self, wx.ID_ANY, _("Select Folder"))
-        
+
         self.__set_properties()
         self.__do_layout()
         self.__bind_events()
@@ -309,13 +347,13 @@ class MyDialog1(wx.Dialog):
         sizer_1 = wx.BoxSizer(wx.VERTICAL)
         sizer_1.Add(self.dir, 1, wx.ALL | wx.EXPAND, 0)
         sizer_1.Add(self.button_1, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
-        
+
 #        sizer_1.Add(self.dir, 1, 0, 0)
 #        sizer_1.Add(self.button_1, 1, 0, 0)
         self.SetSizer(sizer_1)
 #        sizer_1.Fit(self)
         self.Layout()
-    
+
     def __bind_events(self):
         self.Bind(wx.EVT_BUTTON, self.button_2_clicked)
 
